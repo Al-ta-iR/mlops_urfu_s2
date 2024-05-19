@@ -1,0 +1,82 @@
+pipeline {
+    agent any
+    stages {
+        stage('Setup Python') {
+            steps {
+                sh '''
+                    venv_dir="lab2/venv"
+
+                    create_venv() {
+                        if [ ! -d "$venv_dir" ]; then
+                            python3 -m venv "$venv_dir"
+                            echo "venv created"
+                        fi
+                    }
+
+                    deactivate_venv() {
+                        if [ ! -z "$VIRTUAL_ENV" ]; then
+                            deactivate
+                            echo "venv deactivated"
+                        fi
+                    }
+
+                    activate_venv() {
+                        deactivate_venv
+
+                        if [ -d "$venv_dir" ]; then
+                            source "$venv_dir/bin/activate"
+                            echo "venv activated"
+                        else
+                            echo "venv not found"
+                            return 1
+                        fi
+                    }
+
+                    install_dependencies() {
+                        if [ -f "lab2/requirements.txt" ]; then
+                            pip install -r lab2/requirements.txt -qq
+                        else
+                            echo "requirements not found"
+                            return 1
+                        fi
+                    }
+
+                    create_venv && activate_venv && install_dependencies
+                '''
+            }
+        }
+        stage('Get Data') {
+            steps {
+                echo 'Start get data'
+                sh 'lab2/venv/bin/python lab2/get_data.py'
+                echo 'Finish get data'
+            }
+        }
+        stage('Process Data') {
+            steps {
+                echo 'Start process data'
+                sh 'lab2/venv/bin/python lab2/data_processing.py'
+                echo 'Finish process data'
+            }
+        }
+        stage('Prepare Model') {
+            steps {
+                echo 'Start prepare model'
+                sh 'lab2/venv/bin/python lab2/model_preparation.py'
+                echo 'Finish prepare model'
+            }
+        }
+        stage('Test Model') {
+            steps {
+                echo 'Start test model'
+                sh 'lab2/venv/bin/python lab2/model_test.py'
+                echo 'Finish test model'
+            }
+        }
+    }
+    post {
+        always {
+            archiveArtifacts artifacts: 'lab2/**/*.pkl', allowEmptyArchive: true
+        }
+    }
+}
